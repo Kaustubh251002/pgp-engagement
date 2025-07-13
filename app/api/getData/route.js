@@ -1,7 +1,7 @@
 import { getSheetRecords } from "@/lib/gsheet";
 import { NextResponse } from "next/server";
 
-const sheetKey = process.env.TEST_RESPONSES_SHEET_KEY;
+const sheetKey = process.env.RESPONSES_SHEET_KEY;
 
 export async function GET() {
     let submissions = [];
@@ -23,66 +23,71 @@ export async function GET() {
 
     console.log("Helper Data: ", getGameStatistics(gamequeue));
     
+    // Filter votes to only include those for revealed games
+    const filteredVotes = votes.filter(vote => {
+        const targetId = vote["Vote for who"];
+        const correspondingGame = findCorrespondingGame(gamequeue, targetId);
+        return correspondingGame && correspondingGame["Revealed?"] === "1";
+    });
+
     return NextResponse.json({
         leaderboard: leaderboardData,
         raw: {
             submissions,
             gamequeue,
-            votes
+            votes: filteredVotes
         }
     });
 }
 
 function processLeaderboardData(submissions, gamequeue, votes) {
+    // Check if any games are revealed
+    const hasRevealedGames = gamequeue.some(game => game["Revealed?"] === "1");
+    if (!hasRevealedGames) {
+        return []; // Return empty leaderboard if no games revealed
+    }
+    
     // Create a map of all players
     const playersMap = new Map();
     
-    // Initialize players from submissions
-    submissions.forEach(submission => {
-        const playerId = submission["What's your Slack ID?"];
-        const playerName = submission.Name;
-        
-        if (!playersMap.has(playerId)) {
-            playersMap.set(playerId, {
-                id: playerId,
-                name: playerName,
-                totalGuesses: 0,
-                correctGuesses: 0,
-                accuracy: 0,
-                recentActivity: "No activity yet",
-                detailsBreakdown: []
-            });
-        }
-    });
-    
-    // Initialize players from votes if they're not in submissions
-    votes.forEach(vote => {
-        const playerId = vote["Submitted By (ID)"];
-        const playerName = vote["Submitted By (Name)"];
-        
-        if (!playersMap.has(playerId)) {
-            playersMap.set(playerId, {
-                id: playerId,
-                name: playerName,
-                totalGuesses: 0,
-                correctGuesses: 0,
-                accuracy: 0,
-                recentActivity: "No activity yet",
-                detailsBreakdown: []
-            });
-        }
-    });
-    
-    // Filter and process valid votes
+    // Filter and process valid votes (only for revealed games)
     const validVotes = getValidVotes(votes, gamequeue);
+    
+    // Initialize all players who have made votes (check all votes, not just valid ones)
+    votes.forEach(vote => {
+        const voterId = vote["Submitted By (ID)"];
+        const voterName = vote["Submitted By (Name)"];
+        const targetId = vote["Vote for who"];
+        
+        // Check if this vote is for a revealed game
+        const correspondingGame = findCorrespondingGame(gamequeue, targetId);
+        if (correspondingGame && correspondingGame["Revealed?"] === "1") {
+            if (!playersMap.has(voterId)) {
+                playersMap.set(voterId, {
+                    id: voterId,
+                    name: voterName,
+                    totalGuesses: 0,
+                    correctGuesses: 0,
+                    accuracy: 0,
+                    recentActivity: "No activity yet",
+                    detailsBreakdown: []
+                });
+            }
+        }
+    });
     
     // Process valid votes to calculate statistics
     validVotes.forEach(vote => {
         const voterId = vote["Submitted By (ID)"];
-        const voterName = vote["Submitted By (Name)"];
         const targetId = vote["Vote for who"];
-        const guessedStatementIndex = parseInt(vote["Which one do you think is the lie"]) - 1; // Convert to 0-indexed
+        const guessedStatementIndex = parseInt(vote["Which one do you think is the lie"]) - 1;
         const voteTimestamp = vote.Timestamp;
+        
+        // Add validation for parsed data
+        if (isNaN(guessedStatementIndex) || guessedStatementIndex < 0 || guessedStatementIndex > 2) {
+            console.warn(`Invalid statement index for vote: ${vote.Timestamp}`);
+            return;
+        }
         
         const voter = playersMap.get(voterId);
         if (!voter) return;
@@ -91,24 +96,31 @@ function processLeaderboardData(submissions, gamequeue, votes) {
         const correspondingGame = findCorrespondingGame(gamequeue, targetId);
         
         if (correspondingGame) {
-            const correctLieIndex = parseInt(correspondingGame["Lie Index (start from 0)"]);
-            const isCorrect = guessedStatementIndex === correctLieIndex;
             const targetName = correspondingGame.Name;
             
-            // Update voter's statistics
+            // Since validVotes only contains revealed games, we can process normally
+            const correctLieIndex = parseInt(correspondingGame["Lie Index (start from 0)"]);
+            
+            // Validate lie index
+            if (isNaN(correctLieIndex) || correctLieIndex < 0 || correctLieIndex > 2) {
+                console.warn(`Invalid lie index for game: ${targetId}`);
+                return;
+            }
+            
+            const isCorrect = guessedStatementIndex === correctLieIndex;
+            
+            // Count the vote as a guess
             voter.totalGuesses++;
+            
             if (isCorrect) {
                 voter.correctGuesses++;
             }
             
-            // Update accuracy
-            voter.accuracy = voter.totalGuesses > 0 ? Math.round((voter.correctGuesses / voter.totalGuesses) * 100) : 0;
-            
-            // Update recent activity
+            // Update recent activity with result
             const activityVerb = isCorrect ? "correctly guessed" : "incorrectly guessed";
             voter.recentActivity = `${activityVerb} ${targetName}'s lie`;
             
-            // Add to details breakdown
+            // Add to details breakdown with result
             const guessedStatement = getStatementByIndex(correspondingGame, guessedStatementIndex);
             voter.detailsBreakdown.push({
                 target: targetName,
@@ -116,8 +128,12 @@ function processLeaderboardData(submissions, gamequeue, votes) {
                 guess: `Statement ${guessedStatementIndex + 1}`,
                 guessedStatement: guessedStatement,
                 wasCorrect: isCorrect,
-                timestamp: voteTimestamp
+                timestamp: voteTimestamp,
+                revealed: true
             });
+            
+            // Update accuracy (all votes are now for revealed games)
+            voter.accuracy = voter.totalGuesses > 0 ? Math.round((voter.correctGuesses / voter.totalGuesses) * 100) : 0;
         }
     });
     
@@ -161,10 +177,14 @@ function getValidVotes(votes, gamequeue) {
         
         if (!correspondingGame) return;
         
-        // Check if the game was revealed before the vote
-        const revealedAt = correspondingGame["Revealed At"];
+        // Only process votes for revealed games
         const isGameRevealed = correspondingGame["Revealed?"] === "1";
-        console.log(`Processing votes for target: ${targetId}, Revealed: ${isGameRevealed}, Revealed At: ${revealedAt}`);
+        if (!isGameRevealed) {
+            return; // Skip unrevealed games entirely
+        }
+        
+        const revealedAt = correspondingGame["Revealed At"];
+        console.log(`Processing votes for revealed target: ${targetId}, Revealed At: ${revealedAt}`);
         
         // For each voter who voted on this target
         voterMap.forEach((voterVotes, voterId) => {
@@ -177,15 +197,15 @@ function getValidVotes(votes, gamequeue) {
             for (const vote of voterVotes) {
                 const voteDate = new Date(vote.Timestamp);
                 
-                // If game is revealed, check if vote was made before revelation
-                if (isGameRevealed && revealedAt) {
+                // Check if vote was made before revelation
+                if (revealedAt) {
                     const revelationDate = new Date(revealedAt);
                     if (voteDate < revelationDate) {
                         latestValidVote = vote;
                         break; // Found the latest valid vote
                     }
-                } else if (!isGameRevealed) {
-                    // Game not revealed yet, so this vote is valid
+                } else {
+                    // No revelation timestamp, use the latest vote
                     latestValidVote = vote;
                     break;
                 }
