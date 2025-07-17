@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useEffect } from 'react';
-import { Trophy, Target, Zap, AlertCircle, RefreshCw, Moon, Sun, ChevronDown, ArrowUpDown, Wifi, WifiOff, RotateCcw } from 'lucide-react';
+import { Trophy, Target, Zap, AlertCircle, RefreshCw, Moon, Sun, ChevronDown, Wifi, WifiOff, RotateCcw } from 'lucide-react';
 
 const Home = () => {
   const [leaderboardData, setLeaderboardData] = useState([]);
@@ -8,7 +8,6 @@ const Home = () => {
   const [error, setError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [darkMode, setDarkMode] = useState(false);
-  const [sortBy, setSortBy] = useState('correctGuesses');
   const [expandedPlayer, setExpandedPlayer] = useState(null);
   const [isOnline, setIsOnline] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -87,9 +86,6 @@ const Home = () => {
     setDarkMode(!darkMode);
   };
 
-  const handleSort = (criteria) => {
-    setSortBy(criteria);
-  };
 
   const togglePlayerExpansion = (playerId) => {
     setExpandedPlayer(expandedPlayer === playerId ? null : playerId);
@@ -127,19 +123,21 @@ const Home = () => {
     return 'from-red-400 to-pink-500';
   };
 
-  const getAccuracyBadge = (accuracy) => {
-    if (accuracy >= 90) return { text: 'Human polygraph', icon: '🕵️' };
-    if (accuracy >= 80) return { text: 'Lie Detector', icon: '🎯' };
-    if (accuracy >= 70) return { text: 'Sharp Eye', icon: '👁️' };
-    if (accuracy >= 60) return { text: 'Getting Warmer', icon: '🔥' };
-    if (accuracy >= 50) return { text: 'Coin Flipper', icon: '🪙' };
-    return { text: 'Needs Practice', icon: '🤔' };
+  const getRankBadge = (rank) => {
+    switch (rank) {
+      case 0: return { text: 'Truth Seeker Supreme', icon: '🕵️' };
+      case 1: return { text: 'Master Detective', icon: '🎯' };
+      case 2: return { text: 'Sharp Investigator', icon: '👁️' };
+      case 3: return { text: 'Keen Observer', icon: '🔍' };
+      case 4: return { text: 'Amateur Sleuth', icon: '🧐' };
+      default: return null;
+    }
   };
 
   const getRankIcon = (index) => {
     switch (index) {
       case 0: return <Trophy className="w-6 h-6 text-yellow-500" />;
-      case 1: return <div className="w-6 h-6 bg-gray-400 dark:bg-gray-500 rounded-full flex items-center justify-center text-white font-bold text-sm">2</div>;
+      case 1: return <div className="w-6 h-6 bg-gray-400 dark:bg-gray-300 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md">2</div>;
       case 2: return <div className="w-6 h-6 bg-amber-600 rounded-full flex items-center justify-center text-white font-bold text-sm">3</div>;
       default: return <div className="w-6 h-6 bg-gray-300 dark:bg-gray-600 rounded-full flex items-center justify-center text-gray-700 dark:text-gray-200 font-bold text-sm">{index + 1}</div>;
     }
@@ -247,24 +245,11 @@ const Home = () => {
     const aAccuracy = a.totalGuesses > 0 ? (a.correctGuesses / a.totalGuesses) * 100 : 0;
     const bAccuracy = b.totalGuesses > 0 ? (b.correctGuesses / b.totalGuesses) * 100 : 0;
     
-    switch (sortBy) {
-      case 'accuracy':
-        if (bAccuracy !== aAccuracy) {
-          return bAccuracy - aAccuracy;
-        }
-        return b.correctGuesses - a.correctGuesses;
-      case 'totalGuesses':
-        if (b.totalGuesses !== a.totalGuesses) {
-          return b.totalGuesses - a.totalGuesses;
-        }
-        return bAccuracy - aAccuracy;
-      case 'correctGuesses':
-      default:
-        if (b.correctGuesses !== a.correctGuesses) {
-          return b.correctGuesses - a.correctGuesses;
-        }
-        return bAccuracy - aAccuracy;
+    // Sort by correct guesses first, then by accuracy as tiebreaker
+    if (b.correctGuesses !== a.correctGuesses) {
+      return b.correctGuesses - a.correctGuesses;
     }
+    return bAccuracy - aAccuracy;
   });
 
   return (
@@ -312,52 +297,47 @@ const Home = () => {
           <p className={`text-base sm:text-lg ${
             darkMode ? 'text-gray-300' : 'text-gray-600'
           }`}>Who&apos;s the ultimate truth seeker?</p>
+          <p className={`text-sm mt-1 ${
+            darkMode ? 'text-gray-400' : 'text-gray-500'
+          }`}>Ranked by correct guesses</p>
           
           {/* Controls */}
-          <div className="flex flex-col sm:flex-row items-center justify-between mt-6 gap-4">
-            <div className="flex items-center gap-4">
-              {/* Dark mode toggle */}
-              <button
-                onClick={toggleDarkMode}
-                className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 focus:ring-4 ${
-                  darkMode 
-                    ? 'bg-gray-700 hover:bg-gray-600 text-yellow-400 focus:ring-yellow-400/50' 
-                    : 'bg-white hover:bg-gray-50 text-gray-700 shadow-md focus:ring-purple-300'
-                }`}
-                aria-label="Toggle dark mode"
-              >
-                {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-              </button>
-              
-              {/* Online status */}
-              <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
-                isOnline 
-                  ? (darkMode ? 'bg-green-900/50 text-green-300' : 'bg-green-100 text-green-700')
-                  : (darkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-700')
-              }`}>
-                {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-                {isOnline ? 'Online' : 'Offline'}
-              </div>
-            </div>
+          <div className="flex items-center justify-center mt-6 gap-4">
+            {/* Dark mode toggle */}
+            <button
+              onClick={toggleDarkMode}
+              className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 focus:ring-4 ${
+                darkMode 
+                  ? 'bg-gray-700 hover:bg-gray-600 text-yellow-400 focus:ring-yellow-400/50' 
+                  : 'bg-white hover:bg-gray-50 text-gray-700 shadow-md focus:ring-purple-300'
+              }`}
+              aria-label="Toggle dark mode"
+            >
+              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            </button>
             
-            {/* Sort controls */}
-            <div className="flex items-center gap-2">
-              <ArrowUpDown className={`w-4 h-4 ${
-                darkMode ? 'text-gray-400' : 'text-gray-500'
-              }`} />
-              <select
-                value={sortBy}
-                onChange={(e) => handleSort(e.target.value)}
-                className={`px-3 py-2 rounded-lg border text-sm transition-colors duration-200 focus:ring-4 focus:outline-none ${
-                  darkMode 
-                    ? 'bg-gray-700 border-gray-600 text-gray-200 focus:ring-purple-800' 
-                    : 'bg-white border-gray-300 text-gray-700 focus:ring-purple-300'
-                }`}
-              >
-                <option value="correctGuesses">Correct Guesses</option>
-                <option value="accuracy">Accuracy</option>
-                <option value="totalGuesses">Total Guesses</option>
-              </select>
+            {/* Manual refresh */}
+            <button
+              onClick={() => fetchLeaderboardData(true)}
+              className={`p-2 rounded-lg transition-all duration-200 hover:scale-110 focus:ring-4 ${
+                darkMode 
+                  ? 'bg-gray-700 hover:bg-gray-600 text-gray-300 focus:ring-gray-500' 
+                  : 'bg-white hover:bg-gray-50 text-gray-700 shadow-md focus:ring-purple-300'
+              } ${isRefreshing ? 'cursor-not-allowed opacity-50' : ''}`}
+              aria-label="Refresh leaderboard"
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+            
+            {/* Online status */}
+            <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+              isOnline 
+                ? (darkMode ? 'bg-green-900/50 text-green-300' : 'bg-green-100 text-green-700')
+                : (darkMode ? 'bg-red-900/50 text-red-300' : 'bg-red-100 text-red-700')
+            }`}>
+              {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+              {isOnline ? 'Online' : 'Offline'}
             </div>
           </div>
           
@@ -377,8 +357,9 @@ const Home = () => {
         <div className="space-y-4">
           {sortedData.map((player, index) => {
             const accuracy = player.totalGuesses > 0 ? Math.round((player.correctGuesses / player.totalGuesses) * 100) : 0;
-            const badge = getAccuracyBadge(accuracy);
+            const badge = getRankBadge(index);
             const isExpanded = expandedPlayer === player.id;
+            const maxCorrectGuesses = Math.max(...sortedData.map(p => p.correctGuesses), 1);
             
             return (
               <div
@@ -419,28 +400,13 @@ const Home = () => {
                   
                   {/* Stats - responsive grid */}
                   <div className="grid grid-cols-3 sm:flex sm:items-center gap-3 sm:gap-6">
-                    {/* Accuracy Badge */}
+                    {/* Correct Guesses - Primary stat */}
                     <div className="text-center">
-                      <div className={`bg-gradient-to-r ${getAccuracyColor(accuracy)} rounded-full px-2 sm:px-4 py-1 sm:py-2 text-white font-bold text-sm sm:text-lg mb-1`}>
-                        {accuracy}%
-                      </div>
-                      <div className={`flex items-center justify-center gap-1 text-xs font-medium ${
-                        darkMode ? 'text-gray-400' : 'text-gray-600'
-                      }`}>
-                        <span className="text-sm">{badge.icon}</span>
-                        <span className="hidden sm:inline truncate">{badge.text}</span>
-                      </div>
-                    </div>
-                    
-                    {/* Correct Guesses */}
-                    <div className="text-center">
-                      <div className={`text-lg sm:text-2xl font-bold mb-1 ${
-                        darkMode ? 'text-gray-100' : 'text-gray-800'
-                      }`}>
+                      <div className={`text-2xl sm:text-3xl font-bold mb-1 bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent`}>
                         {player.correctGuesses}
                       </div>
-                      <div className={`text-xs sm:text-sm ${
-                        darkMode ? 'text-gray-500' : 'text-gray-500'
+                      <div className={`text-sm sm:text-base font-semibold ${
+                        darkMode ? 'text-gray-300' : 'text-gray-700'
                       }`}>
                         Correct
                       </div>
@@ -459,6 +425,36 @@ const Home = () => {
                         Total
                       </div>
                     </div>
+                    
+                    {/* Badge or Accuracy */}
+                    <div className="text-center">
+                      {badge ? (
+                        <>
+                          <div className={`bg-gradient-to-r ${getAccuracyColor(accuracy)} rounded-lg px-2 sm:px-3 py-1 text-white font-medium text-xs sm:text-sm mb-1 flex items-center justify-center gap-1`}>
+                            <span className="text-xs">{badge.icon}</span>
+                            <span className="hidden sm:inline">{accuracy}%</span>
+                            <span className="sm:hidden">{accuracy}%</span>
+                          </div>
+                          <div className={`text-xs font-medium ${
+                            darkMode ? 'text-gray-400' : 'text-gray-600'
+                          } truncate`}>
+                            <span className="hidden sm:inline">{badge.text}</span>
+                            <span className="sm:hidden">Badge</span>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className={`bg-gradient-to-r ${getAccuracyColor(accuracy)} rounded-lg px-2 sm:px-3 py-1 text-white font-medium text-xs sm:text-sm mb-1`}>
+                            {accuracy}%
+                          </div>
+                          <div className={`text-xs ${
+                            darkMode ? 'text-gray-500' : 'text-gray-500'
+                          }`}>
+                            Accuracy
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
                   
                   {/* Expand indicator */}
@@ -467,14 +463,14 @@ const Home = () => {
                   } ${isExpanded ? 'rotate-180' : ''}`} />
                 </div>
                 
-                {/* Progress Bar */}
+                {/* Progress Bar - Now represents correct guesses progress */}
                 <div className="mt-4">
                   <div className={`rounded-full h-2 ${
                     darkMode ? 'bg-gray-700' : 'bg-gray-200'
                   }`}>
                     <div
-                      className={`bg-gradient-to-r ${getAccuracyColor(accuracy)} rounded-full h-2 transition-all duration-1000 ease-out`}
-                      style={{ width: `${accuracy}%` }}
+                      className={`bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full h-2 transition-all duration-1000 ease-out`}
+                      style={{ width: `${Math.max((player.correctGuesses / maxCorrectGuesses) * 100, 2)}%` }}
                     ></div>
                   </div>
                 </div>
@@ -488,7 +484,7 @@ const Home = () => {
                       <div className="text-center">
                         <div className={`text-sm font-medium ${
                           darkMode ? 'text-gray-400' : 'text-gray-500'
-                        }`}>Win Rate</div>
+                        }`}>Accuracy</div>
                         <div className={`text-xl font-bold ${
                           darkMode ? 'text-gray-100' : 'text-gray-800'
                         }`}>{accuracy}%</div>
@@ -501,14 +497,19 @@ const Home = () => {
                           darkMode ? 'text-gray-100' : 'text-gray-800'
                         }`}>#{index + 1}</div>
                       </div>
-                      <div className="text-center">
-                        <div className={`text-sm font-medium ${
-                          darkMode ? 'text-gray-400' : 'text-gray-500'
-                        }`}>Badge</div>
-                        <div className={`text-sm font-medium ${
-                          darkMode ? 'text-gray-300' : 'text-gray-700'
-                        }`}>{badge.text}</div>
-                      </div>
+                      {badge && (
+                        <div className="text-center">
+                          <div className={`text-sm font-medium ${
+                            darkMode ? 'text-gray-400' : 'text-gray-500'
+                          }`}>Badge</div>
+                          <div className={`text-sm font-medium flex items-center justify-center gap-1 ${
+                            darkMode ? 'text-gray-300' : 'text-gray-700'
+                          }`}>
+                            <span>{badge.icon}</span>
+                            <span className="truncate">{badge.text}</span>
+                          </div>
+                        </div>
+                      )}
                       <div className="text-center">
                         <div className={`text-sm font-medium ${
                           darkMode ? 'text-gray-400' : 'text-gray-500'

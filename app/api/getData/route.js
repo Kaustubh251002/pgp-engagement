@@ -17,7 +17,6 @@ export async function GET() {
         return NextResponse.json({ error: "Failed to fetch data" }, { status: 500 });
     }
 
-    
     // Process data into leaderboard format
     const leaderboardData = processLeaderboardData(submissions, gamequeue, votes);
 
