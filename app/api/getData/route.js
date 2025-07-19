@@ -187,13 +187,13 @@ function getValidVotes(votes, gamequeue) {
         // Convert revealed date to 6am PST timestamp if it's just a date
         let revelationDate = null;
         if (revealedAt) {
-            if (revealedAt.includes('6:00:00 AM PST')) {
+            if (revealedAt.includes('1:00:00 PM')) {
                 // Already has time, use as is
                 revelationDate = new Date(revealedAt);
             } else {
                 // Just a date, convert to 6am PST
                 const datePart = revealedAt.split(' ')[0]; // Get just the date part
-                revelationDate = new Date(`${datePart} 6:00:00 AM PST`);
+                revelationDate = new Date(`${datePart} 1:00:00 PM`);
             }
         }
         
@@ -208,11 +208,13 @@ function getValidVotes(votes, gamequeue) {
             let latestValidVote = null;
             
             for (const vote of voterVotes) {
+                // Convert UTC timestamp to IST (UTC + 5:30)
                 const voteDate = new Date(vote.Timestamp);
-                
+                const voteIST = new Date(voteDate.getTime() + (5.5 * 60 * 60 * 1000));
+                                            
                 // Check if vote was made before revelation
                 if (revelationDate) {
-                    if (voteDate < revelationDate) {
+                    if (voteIST < revelationDate) {
                         latestValidVote = vote;
                         break; // Found the latest valid vote
                     }
@@ -228,7 +230,6 @@ function getValidVotes(votes, gamequeue) {
             }
         });
     });
-    console.log("Valid Votes Count: ", validVotes);
     return validVotes;
 }
 
