@@ -186,18 +186,16 @@ function getValidVotes(votes, gamequeue) {
         
         // Convert revealed date to 6am PST timestamp if it's just a date
         let revelationDate = null;
+        let revelationDateIST = null;
         if (revealedAt) {
-            if (revealedAt.includes('1:00:00 PM')) {
-                // Already has time, use as is
-                revelationDate = new Date(revealedAt);
-            } else {
-                // Just a date, convert to 6am PST
-                const datePart = revealedAt.split(' ')[0]; // Get just the date part
-                revelationDate = new Date(`${datePart} 1:00:00 PM`);
-            }
+            // Just a date, convert to 6am PST
+            const datePart = revealedAt.split(' ')[0]; // Get just the date part
+            revelationDate = new Date(`${datePart}`);
+            revelationDateIST = new Date(revelationDate.getTime() + (24 * 60 * 60 * 1000));
         }
         
-        console.log(`Processing votes for revealed target: ${targetId}, Revealed At: ${revelationDate}`);
+        console.log(`Processing votes for revealed target: ${targetId}, Revealed At: ${revelationDate}, Raw Revealed At: ${revealedAt}`);
+
         
         // For each voter who voted on this target
         voterMap.forEach((voterVotes, voterId) => {
@@ -213,8 +211,8 @@ function getValidVotes(votes, gamequeue) {
                 const voteIST = new Date(voteDate.getTime() + (5.5 * 60 * 60 * 1000));
                                             
                 // Check if vote was made before revelation
-                if (revelationDate) {
-                    if (voteIST < revelationDate) {
+                if (revelationDateIST) {
+                    if (voteIST < revelationDateIST) {
                         latestValidVote = vote;
                         break; // Found the latest valid vote
                     }
