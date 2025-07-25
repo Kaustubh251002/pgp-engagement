@@ -191,10 +191,10 @@ function getValidVotes(votes, gamequeue) {
             // Just a date, convert to 6am PST
             const datePart = revealedAt.split(' ')[0]; // Get just the date part
             revelationDate = new Date(`${datePart}`);
-            revelationDateIST = new Date(revelationDate.getTime() + (24 * 60 * 60 * 1000));
+            revelationDateIST = new Date(revelationDate.getTime() + (18.5 * 60 * 60 * 1000));
         }
         
-        console.log(`Processing votes for revealed target: ${targetId}, Revealed At: ${revelationDate}, Raw Revealed At: ${revealedAt}`);
+        console.log(`Processing votes for revealed target: ${targetId}, Revealed At: ${revelationDateIST}, Raw Revealed At: ${revealedAt}`);
 
         
         // For each voter who voted on this target
@@ -206,20 +206,19 @@ function getValidVotes(votes, gamequeue) {
             let latestValidVote = null;
             
             for (const vote of voterVotes) {
+                
                 // Convert UTC timestamp to IST (UTC + 5:30)
                 const voteDate = new Date(vote.Timestamp);
                 const voteIST = new Date(voteDate.getTime() + (5.5 * 60 * 60 * 1000));
-                                            
+                if(voterId == "U089LQEV5JQ"){
+                    console.log(voteIST);
+                }                        
                 // Check if vote was made before revelation
                 if (revelationDateIST) {
                     if (voteIST < revelationDateIST) {
                         latestValidVote = vote;
                         break; // Found the latest valid vote
                     }
-                } else {
-                    // No revelation timestamp, use the latest vote
-                    latestValidVote = vote;
-                    break;
                 }
             }
             
